@@ -62,8 +62,13 @@ class ReplayBuffer(object):
 
 def compute_td_loss(batch_size):
     state, action, reward, next_state, done = replay_buffer.sample(batch_size)
+
+
     state = state.reshape(batch_size*T,1,state.shape[-2],state.shape[-1])
     next_state = next_state.reshape(batch_size*T, 1, state.shape[-2],state.shape[-1])
+
+
+
     state      = Variable(torch.FloatTensor(np.float32(state)))
     next_state = Variable(torch.FloatTensor(np.float32(next_state)), volatile=True)
     action     = Variable(torch.LongTensor(action))
@@ -103,6 +108,9 @@ env    = wrap_pytorch(env)
 
 
 # In[24]:
+
+
+
 T = env.observation_space.shape[0]
 print("The number of time steps = ", T)
 class CnnDQN(nn.Module):
@@ -143,7 +151,6 @@ class CnnDQN(nn.Module):
         x[:, :, :c // 8, :, :] = torch.roll(x[:, :, :c // 8, :, :], shifts=1, dims=1)
         x[:, 0, :c // 8, :, :] = copy[:, 0, :c // 8, :, :]
         x = x.reshape(n,c,h,w)
-
         x = self.relu3(self.conv3(x))
         n, c, h, w = x.shape
         x = x.reshape(n//T, T, c, h, w)

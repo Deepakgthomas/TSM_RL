@@ -1,11 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+#todo MakeNote1 -> I stacked 3 frames and reshaped the PyTorch wrapper to have a shape (3,1,84,84)
+#todo MakeNote2 -> The state and env.observation.shape don't have the same shape
+
+#todo Check this code with original once again
+
 # In[1]:
 
 
 import math, random
-
+import cv2
 import gym
 import numpy as np
 
@@ -14,6 +19,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.autograd as autograd 
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
 
 # <h3>Use Cuda</h3>
@@ -31,6 +37,7 @@ Variable = lambda *args, **kwargs: autograd.Variable(*args, **kwargs).cuda() if 
 
 # In[28]:
 
+from collections import deque
 
 class NaivePrioritizedBuffer(object):
     def __init__(self, capacity, prob_alpha=0.6):
@@ -71,8 +78,9 @@ class NaivePrioritizedBuffer(object):
         weights  = (total * probs[indices]) ** (-beta)
         weights /= weights.max()
         weights  = np.array(weights, dtype=np.float32)
-        
-        batch       = zip(*samples)
+        #todo The author wrote this originally, which didn't work. Need to investigate.
+        # batch       = zip(*samples)
+        batch  = list(zip(*samples))
         states      = np.concatenate(batch[0])
         actions     = batch[1]
         rewards     = batch[2]
@@ -109,7 +117,6 @@ def update_target(current_model, target_model):
 # In[13]:
 
 
-update_target(current_model, target_model)
 
 
 # <h2>Computing Temporal Difference Loss</h2>
@@ -118,7 +125,13 @@ update_target(current_model, target_model)
 
 
 def compute_td_loss(batch_size, beta):
-    state, action, reward, next_state, done, indices, weights = replay_buffer.sample(batch_size, beta) 
+    state, action, reward, next_state, done, indices, weights = replay_buffer.sample(batch_size, beta)
+
+
+    state = state.reshape(batch_size*T,1,state.shape[-2],state.shape[-1])
+    next_state = next_state.reshape(batch_size*T, 1, state.shape[-2],state.shape[-1])
+
+
 
     state      = Variable(torch.FloatTensor(np.float32(state)))
     next_state = Variable(torch.FloatTensor(np.float32(next_state)))
@@ -157,7 +170,7 @@ from common.wrappers import make_atari, wrap_deepmind, wrap_pytorch
 # In[18]:
 
 
-env_id = "PongNoFrameskip-v4"
+env_id = "EnduroNoFrameskip-v4"
 env    = make_atari(env_id)
 env    = wrap_deepmind(env)
 env    = wrap_pytorch(env)
@@ -166,31 +179,58 @@ env    = wrap_pytorch(env)
 # In[36]:
 
 
+
+T = env.observation_space.shape[0] #Time Component
+Shift = 10 # The first 1/shift channels will be rolled
+print("The number of time steps = ", T)
 class CnnDQN(nn.Module):
     def __init__(self, input_shape, num_actions):
         super(CnnDQN, self).__init__()
         
         self.input_shape = input_shape
         self.num_actions = num_actions
-        
-        self.features = nn.Sequential(
-            nn.Conv2d(input_shape[0], 32, kernel_size=8, stride=4),
-            nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1),
-            nn.ReLU()
-        )
+
+        self.conv1 = nn.Conv2d(input_shape[1], 32, kernel_size=8, stride=4)
+        self.relu1 = nn.ReLU()
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        self.relu2 = nn.ReLU()
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        self.relu3 = nn.ReLU()
+
         
         self.fc = nn.Sequential(
-            nn.Linear(self.feature_size(), 512),
+            nn.Linear(18816, 512),
             nn.ReLU(),
             nn.Linear(512, self.num_actions)
         )
         
     def forward(self, x):
-        x = self.features(x)
+
+        x = self.relu1(self.conv1(x))
+
+        n,c,h,w = x.shape
+        x = x.reshape(n//T, T, c, h, w)
+        copy = torch.clone(x)
+        x[:,:, :c//Shift, :, :] = torch.roll(x[:,:, :c//Shift, :, :], shifts = 1, dims = 1)
+        x[:,0, :c//Shift, :, :] = copy[:,0, :c//Shift, :, :]
+        x = x.reshape(n, c, h, w)
+        x = self.relu2(self.conv2(x))
+        n, c, h, w = x.shape
+        x = x.reshape(n//T, T, c, h, w)
+        copy = torch.clone(x)
+        x[:, :, :c // Shift, :, :] = torch.roll(x[:, :, :c // Shift, :, :], shifts=1, dims=1)
+        x[:, 0, :c // Shift, :, :] = copy[:, 0, :c // Shift, :, :]
+        x = x.reshape(n,c,h,w)
+        x = self.relu3(self.conv3(x))
+        n, c, h, w = x.shape
+        x = x.reshape(n//T, T, c, h, w)
+        copy = torch.clone(x)
+        x[:, :, :c // Shift, :, :] = torch.roll(x[:, :, :c // Shift, :, :], shifts=1, dims=1)
+        x[:, 0, :c // Shift, :, :] = copy[:, 0, :c // Shift, :, :]
         x = x.view(x.size(0), -1)
+
+
+        # todo MakeNote3 -> Changed the shape in x.view to get back 32 states
         x = self.fc(x)
         return x
     
@@ -199,7 +239,7 @@ class CnnDQN(nn.Module):
     
     def act(self, state, epsilon):
         if random.random() > epsilon:
-            state   = Variable(torch.FloatTensor(np.float32(state)).unsqueeze(0), volatile=True)
+            state   = Variable(torch.FloatTensor(np.float32(state)), volatile=True)
             q_value = self.forward(state)
             action  = q_value.max(1)[1].data[0]
         else:
@@ -240,7 +280,6 @@ epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_fi
 # In[39]:
 
 
-plt.plot([epsilon_by_frame(i) for i in range(1000000)])
 
 
 # <h3>Beta Prioritized Experience Replay</h3>
@@ -256,46 +295,50 @@ beta_by_frame = lambda frame_idx: min(1.0, beta_start + frame_idx * (1.0 - beta_
 # In[41]:
 
 
-plt.plot([beta_by_frame(i) for i in range(1000000)])
 
-
-# <h3>Training</h3>
-
-# In[42]:
-
-
-num_frames = 1000000
+num_frames = 1400000
 batch_size = 32
 gamma      = 0.99
 
 losses = []
+reward_step = np.empty(shape = num_frames)
+
 all_rewards = []
 episode_reward = 0
 
-state = env.reset()
+state = np.expand_dims(env.reset(), axis = 1)
 for frame_idx in range(1, num_frames + 1):
+    print("Frame = ", frame_idx)
     epsilon = epsilon_by_frame(frame_idx)
     action = current_model.act(state, epsilon)
     
     next_state, reward, done, _ = env.step(action)
+
+    next_state = np.expand_dims(next_state, axis = 1)
+
+
     replay_buffer.push(state, action, reward, next_state, done)
     
     state = next_state
     episode_reward += reward
-    
+    reward_step[frame_idx - 1] = reward
+
     if done:
-        state = env.reset()
+        state = np.expand_dims(env.reset(), axis = 1)
         all_rewards.append(episode_reward)
+        np.savetxt('pr_tsm.out', all_rewards, delimiter=',')
         episode_reward = 0
-        
     if len(replay_buffer) > replay_initial:
         beta = beta_by_frame(frame_idx)
         loss = compute_td_loss(batch_size, beta)
         losses.append(loss.data)
-        
-    if frame_idx % 10000 == 0:
-        plot(frame_idx, all_rewards, losses)
-        
+
+
+    if frame_idx % 100000 == 0:
+        print("Frame Index = ", frame_idx)
+        np.savetxt('pr_tsm_step.out', reward_step, delimiter=',')
+
+
     if frame_idx % 1000 == 0:
         update_target(current_model, target_model)
         
