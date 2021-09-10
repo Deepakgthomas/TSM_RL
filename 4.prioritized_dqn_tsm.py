@@ -26,11 +26,16 @@ import matplotlib.pyplot as plt
 
 # In[3]:
 
+seed = 1994
 
 USE_CUDA = torch.cuda.is_available()
 Variable = lambda *args, **kwargs: autograd.Variable(*args, **kwargs).cuda() if USE_CUDA else autograd.Variable(*args, **kwargs)
 
-
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+torch.cuda.manual_seed(seed)
+torch.backends.cudnn.deterministic = True
 # <h2>Prioritized Replay Buffer</h2>
 
 # <p>Prioritized Experience Replay: https://arxiv.org/abs/1511.05952</p>
@@ -174,7 +179,7 @@ env_id = "PongNoFrameskip-v4"
 env    = make_atari(env_id)
 env    = wrap_deepmind(env)
 env    = wrap_pytorch(env)
-
+env.seed(seed)
 
 # In[36]:
 
