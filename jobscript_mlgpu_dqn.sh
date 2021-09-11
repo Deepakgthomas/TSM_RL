@@ -7,9 +7,9 @@
 #SBATCH --partition=gpu #specify the gpu partition
 
 # everything below this line is optional, but are nice to have quality of life things
-#SBATCH --output=job.%J.out # tell it to store the output console text to a file called job.<assigned job number>.out
-#SBATCH --error=job.%J.err # tell it to store the error messages from the program (if it doesn't write them to normal console output) to a file called job.<assigned job muber>.err
-#SBATCH --job-name="example job" # a nice readable name to give your job so you know what it is when you see it in the queue, instead of just numbers
+#SBATCH --output=dqn.%J.out # tell it to store the output console text to a file called job.<assigned job number>.out
+#SBATCH --error=dqn.%J.err # tell it to store the error messages from the program (if it doesn't write them to normal console output) to a file called job.<assigned job muber>.err
+#SBATCH --job-name="dqn" # a nice readable name to give your job so you know what it is when you see it in the queue, instead of just numbers
 
 # under this we just do what we would normally do to run the program, everything above this line is used by slurm to tell it what your job needs for resources
 # let's load the modules we need to do what we're going to do
@@ -22,4 +22,5 @@ cd /work/LAS/jannesar-lab/deepak/TSM_Working
 
 # the commands we're running are below, this executes my python code
 ml-gpu python3 4.prioritized_dqn.py
+
 

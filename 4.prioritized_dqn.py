@@ -189,7 +189,7 @@ class CnnDQN(nn.Module):
         self.relu3 = nn.ReLU()
 
         self.fc = nn.Sequential(
-            nn.Linear(18816, 512),
+            nn.Linear(9408, 512),
             nn.ReLU(),
             nn.Linear(512, self.num_actions)
         )
