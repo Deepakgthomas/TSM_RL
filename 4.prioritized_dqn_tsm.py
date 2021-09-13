@@ -175,7 +175,7 @@ from common.wrappers import make_atari, wrap_deepmind, wrap_pytorch
 # In[18]:
 
 
-env_id = "PongNoFrameskip-v4"
+env_id = "FreewayNoFrameskip-v4"
 env    = make_atari(env_id)
 env    = wrap_deepmind(env)
 env    = wrap_pytorch(env)
@@ -186,7 +186,7 @@ env.seed(seed)
 
 
 T = env.observation_space.shape[0] #Time Component
-Shift = 2 # The first 1/shift channels will be rolled
+Shift = 5 # The first 1/shift channels will be rolled
 print(Shift, "inverse channels are going to be rolled")
 print("The number of time steps = ", T)
 print("The environment is = ", env_id)
