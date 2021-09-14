@@ -186,7 +186,7 @@ env.seed(seed)
 
 
 T = env.observation_space.shape[0] #Time Component
-Shift = 5 # The first 1/shift channels will be rolled
+Shift = 3 # The first 1/shift channels will be rolled
 print(Shift, "inverse channels are going to be rolled")
 print("The number of time steps = ", T)
 print("The environment is = ", env_id)
@@ -314,6 +314,7 @@ all_rewards = []
 episode_reward = 0
 
 state = np.expand_dims(env.reset(), axis = 1)
+filename = "tsm_"+env_id[0:6]+"_"+str(seed)+"_"+str(T)+"_"+str(Shift)+".out"
 for frame_idx in range(1, num_frames + 1):
     print("Frame = ", frame_idx)
     epsilon = epsilon_by_frame(frame_idx)
@@ -333,7 +334,7 @@ for frame_idx in range(1, num_frames + 1):
     if done:
         state = np.expand_dims(env.reset(), axis = 1)
         all_rewards.append(episode_reward)
-        np.savetxt('pr_tsm.out', all_rewards, delimiter=',')
+        np.savetxt(filename, all_rewards, delimiter=',')
         episode_reward = 0
     if len(replay_buffer) > replay_initial:
         beta = beta_by_frame(frame_idx)
