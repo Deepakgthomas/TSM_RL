@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 
 # In[3]:
 
-seed = 1994
+seed = 7779
 
 USE_CUDA = torch.cuda.is_available()
 Variable = lambda *args, **kwargs: autograd.Variable(*args, **kwargs).cuda() if USE_CUDA else autograd.Variable(*args, **kwargs)
@@ -175,18 +175,20 @@ from common.wrappers import make_atari, wrap_deepmind, wrap_pytorch
 # In[18]:
 
 
-env_id = "FreewayNoFrameskip-v4"
+env_id = "RiverraidNoFrameskip-v4"
 env    = make_atari(env_id)
 env    = wrap_deepmind(env)
 env    = wrap_pytorch(env)
 env.seed(seed)
 env.action_space.seed(seed)
+env.observation_space.seed(seed)
+
 # In[36]:
 
 
 
 T = env.observation_space.shape[0] #Time Component
-Shift = 3 # The first 1/shift channels will be rolled
+Shift = 5 # The first 1/shift channels will be rolled
 print(Shift, "inverse channels are going to be rolled")
 print("The number of time steps = ", T)
 print("The environment is = ", env_id)
@@ -317,6 +319,7 @@ state = np.expand_dims(env.reset(), axis = 1)
 filename = "tsm_"+env_id[0:6]+"_"+str(seed)+"_"+str(T)+"_"+str(Shift)+".out"
 for frame_idx in range(1, num_frames + 1):
     print("Frame = ", frame_idx)
+
     epsilon = epsilon_by_frame(frame_idx)
     action = current_model.act(state, epsilon)
     
